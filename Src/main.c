@@ -85,7 +85,6 @@ PUTCHAR_PROTOTYPE
 #define PCA9635_ADDR 0x20 << 1
 #define NUM_CHANNELS 5
 
-uint16_t phase_shift_values[NUM_CHANNELS+1] = {0, 256/1, 256/2, 256/3, 256/4, 256/5};
 GPIO_TypeDef *channels_port_mapping[NUM_CHANNELS] = {GPIOB, GPIOB, GPIOB, GPIOB, GPIOA};
 uint16_t channels_pin_mapping[NUM_CHANNELS] = {GPIO_PIN_12, GPIO_PIN_13, GPIO_PIN_14, GPIO_PIN_15, GPIO_PIN_8};
 uint8_t pca9635_output_mapping[NUM_CHANNELS] = {0x02, 0x03, 0x04, 0x05, 0x06};
@@ -116,12 +115,30 @@ void i2cscan() {
   /*--[ Scanning Done ]--*/
 }
 
-void pca_swrst() {
+void pca9635_swrst() {
   uint8_t mode1[2] = {0xA5, 0x5A}; //  magic byte 1, magic byte 2
   HAL_I2C_Master_Transmit (&hi2c1, PCA9635_SWRST, mode1, 2, 5);
   uint8_t magic3 = 0x06;
   HAL_I2C_Master_Transmit (&hi2c1, 0x00, &magic3, 2, 5);
 
+}
+
+void pca9635_init() {
+    // https://www.nxp.com/docs/en/data-sheet/PCA9635.pdf, page 10-13
+    uint8_t mode1[2] = {0x00, 0b10000001};
+    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, mode1, 2, 5);
+
+    uint8_t mode2[2] = {0x01, 0b00000110};
+    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, mode2, 2, 5);
+
+    uint8_t ledout0[2] = {0x14, 0b10101010};
+    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout0, 2, 5);
+    uint8_t ledout1[2] = {0x15, 0b10101010};
+    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout1, 2, 5);
+    uint8_t ledout2[2] = {0x16, 0b10101010};
+    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout2, 2, 5);
+    uint8_t ledout3[2] = {0x17, 0b10101010};
+    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout3, 2, 5);
 }
 
 /* USER CODE END 0 */
@@ -136,7 +153,7 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
   uint8_t channels_on_state[NUM_CHANNELS] = {0,0,0,0,0};
-  uint16_t brightness_setting_state = 0;
+  uint8_t brightness_setting_state = 0;
   float current_brightness_setting = 0;
   uint8_t blink = 0;
 
@@ -168,66 +185,10 @@ int main(void)
   TIM2->CNT = 0;
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
 
-  i2cscan();
-  pca_swrst();
+  i2cscan(); // TODO rem
+  pca9635_swrst();
+  pca9635_init();
 
-  uint8_t mode1[2] = {0x00, 0b10000001};
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, mode1, 2, 5);
-
-  uint8_t mode2[2] = {0x01, 0b00000110};
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, mode2, 2, 5);
-
-  uint8_t ledout0[2] = {0x14, 0b10101010};
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout0, 2, 5);
-  uint8_t ledout1[2] = {0x15, 0b10101010};
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout1, 2, 5);
-  uint8_t ledout2[2] = {0x16, 0b10101010};
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout2, 2, 5);
-  uint8_t ledout3[2] = {0x17, 0b10101010};
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout3, 2, 5);
-
-  uint8_t pwm0[2] = {0x02, 0b10000000};
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, pwm0, 2, 5);
-  uint8_t pwm1[2] = {0x03, 0b10000000};
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, pwm1, 2, 5);
-  uint8_t pwm2[2] = {0x04, 0b10000000};
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, pwm2, 2, 5);
-  uint8_t pwm3[2] = {0x05, 0b10000000};
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, pwm3, 2, 5);
-  uint8_t pwm4[2] = {0x06, 0b10000000};
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, pwm4, 2, 5);
-
-
-
-  // setup PCA9635: enable change on ACK
-
-  // disable sleep and allcall addr
-  // uint8_t mode1[2] = {0x01, 0b10000000};
-  // HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, &mode1, 2, 5);
-  // HAL_Delay(1);
-  //
-  // // ???
-  // uint8_t mode2[2] = {0x01, 0b00001100};
-  // HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, &mode2, 2, 5);
-  //
-  // // uint8_t grppwm[2] = {0x12, 0xC8};
-  // // HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, &grppwm, 2, 5);
-  // //
-  // // uint8_t grpfreq[2] = {0x13, 0xC8};
-  // // HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, &grpfreq, 2, 5);
-  //
-  // uint8_t ledout0[2] = {0x14, 0xFF};
-  // HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, &ledout0, 2, 5);
-  // uint8_t ledout1[2] = {0x15, 0xFF};
-  // HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, &ledout1, 2, 5);
-  // uint8_t ledout2[2] = {0x16, 0xFF};
-  // HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, &ledout2, 2, 5);
-  // uint8_t ledout3[2] = {0x17, 0xFF};
-  // HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, &ledout3, 2, 5);
-  //
-  // uint8_t pwm0[2] = {0x02, 0xC8};
-  // HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, &pwm0, 2, 5);
-  //
   printf("Setup DONE!\r\n");
   i2cscan();
 
@@ -271,7 +232,6 @@ int main(void)
 
     // https://alexgyver.ru/lessons/led-crt/
     // out = max * ((val / max) ^ gamma)
-
     float real_brightness_setting = 750.0f * pow((float)(brightness_setting << 6) / 4096.0f, 2.0f);
 
     if(current_brightness_setting < real_brightness_setting) {
@@ -288,7 +248,7 @@ int main(void)
       }
     }
 
-    brightness_setting = (uint16_t)current_brightness_setting;
+    brightness_setting = (uint8_t)current_brightness_setting;
 
     if(brightness_setting_state != brightness_setting) {
       state_changed = 1;
@@ -296,44 +256,25 @@ int main(void)
       printf("brightness_setting = %d\r\n", brightness_setting);
     }
 
-    uint8_t num_channels_on = 0;
-
     for(uint8_t i = 0; i < NUM_CHANNELS; i++) {
       GPIO_PinState on = !HAL_GPIO_ReadPin(channels_port_mapping[i], channels_pin_mapping[i]);
       if(channels_on_state[i] != on) {
         state_changed = 1;
         channels_on_state[i] = on;
       }
-      if(on) {
-        num_channels_on++;
-      }
     }
 
     if(state_changed) {
-      uint16_t phase_shift = phase_shift_values[num_channels_on];
-      uint16_t from = 0;
-
       for(uint8_t i = 0; i < NUM_CHANNELS; i++) {
-        uint8_t led_on_l = 0, led_on_h = 0, led_off_l = 0, led_off_h = 0b00010000;
         if(channels_on_state[i] && brightness_setting > 0) {
-          uint16_t to = from + brightness_setting;
-
-          if(to >= 4096) {
-            to -= 4096;
-          }
-          led_on_l = (uint8_t)(from >> 0) & 0xFF;
-          led_on_h = (uint8_t)(from >> 8) & 0xFF;
-          led_off_l = (uint8_t)(to >> 0) & 0xFF;
-          led_off_h = (uint8_t)(to >> 8) & 0xFF;
-          printf("ch %d on: %d off: %d --- %02x %02x %02x %02x %02x\r\n", i, from, to, pca9635_output_mapping[i], led_on_l, led_on_h, led_off_l, led_off_h);
-          from += phase_shift;
+          printf("ch %d duty cycle: %d\r\n", i, brightness_setting);
         }
         else {
           printf("ch %d off\r\n", i);
         }
 
-        uint8_t buffer[5] = {pca9635_output_mapping[i], led_on_l, led_on_h, led_off_l, led_off_h};
-        HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, buffer, 5, 5);
+        uint8_t buffer[2] = {pca9635_output_mapping[i], brightness_setting};
+        HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, buffer, 2, 5);
       }
     }
 
