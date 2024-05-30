@@ -153,7 +153,7 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
   uint8_t channels_on_state[NUM_CHANNELS] = {0,0,0,0,0};
-  uint8_t brightness_setting_state = 0;
+  uint16_t brightness_setting_state = 0;
   float current_brightness_setting = 0;
   uint8_t blink = 0;
 
@@ -230,6 +230,7 @@ int main(void)
       brightness_setting = 64;
     }
 
+
     // https://alexgyver.ru/lessons/led-crt/
     // out = max * ((val / max) ^ gamma)
     float real_brightness_setting = 750.0f * pow((float)(brightness_setting << 6) / 4096.0f, 2.0f);
@@ -248,12 +249,12 @@ int main(void)
       }
     }
 
-    brightness_setting = (uint8_t)current_brightness_setting;
+    brightness_setting = (uint16_t)current_brightness_setting;
 
     if(brightness_setting_state != brightness_setting) {
       state_changed = 1;
       brightness_setting_state = brightness_setting;
-      printf("brightness_setting = %d\r\n", brightness_setting);
+      //printf("brightness_setting = %d\r\n", brightness_setting);
     }
 
     for(uint8_t i = 0; i < NUM_CHANNELS; i++) {
