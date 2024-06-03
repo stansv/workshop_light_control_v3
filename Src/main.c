@@ -18,6 +18,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "i2c.h"
+#include "tim.h"
+#include "usart.h"
+#include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -44,11 +48,6 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-I2C_HandleTypeDef hi2c1;
-
-TIM_HandleTypeDef htim2;
-
-UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 
@@ -56,10 +55,6 @@ UART_HandleTypeDef huart1;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_TIM2_Init(void);
-static void MX_USART1_UART_Init(void);
-static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 #ifdef __GNUC__
@@ -81,13 +76,15 @@ PUTCHAR_PROTOTYPE
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-#define PCA9635_SWRST 0x03 << 1
-#define PCA9635_ADDR 0x20 << 1
+// #define PCA9635_SWRST 0x03 << 1
+// #define PCA9635_ADDR 0x20 << 1
 #define NUM_CHANNELS 5
 
 GPIO_TypeDef *channels_port_mapping[NUM_CHANNELS] = {GPIOB, GPIOB, GPIOB, GPIOB, GPIOA};
 uint16_t channels_pin_mapping[NUM_CHANNELS] = {GPIO_PIN_12, GPIO_PIN_13, GPIO_PIN_14, GPIO_PIN_15, GPIO_PIN_8};
-uint8_t pca9635_output_mapping[NUM_CHANNELS] = {0x02, 0x03, 0x04, 0x05, 0x06};
+//uint8_t pca9635_output_mapping[NUM_CHANNELS] = {0x02, 0x03, 0x04, 0x05, 0x06};
+uint32_t *tim_ccr_mapping[NUM_CHANNELS] = {&TIM3->CCR1, &TIM3->CCR2, &TIM3->CCR3, &TIM3->CCR4, &TIM1->CCR4};
+
 volatile uint8_t off = 0;
 volatile uint8_t off_bounce_count = 0;
 uint16_t remembered_cnt = 0;
@@ -115,31 +112,31 @@ void i2cscan() {
   /*--[ Scanning Done ]--*/
 }
 
-void pca9635_swrst() {
-  uint8_t mode1[2] = {0xA5, 0x5A}; //  magic byte 1, magic byte 2
-  HAL_I2C_Master_Transmit (&hi2c1, PCA9635_SWRST, mode1, 2, 5);
-  uint8_t magic3 = 0x06;
-  HAL_I2C_Master_Transmit (&hi2c1, 0x00, &magic3, 2, 5);
-
-}
-
-void pca9635_init() {
-    // https://www.nxp.com/docs/en/data-sheet/PCA9635.pdf, page 10-13
-    uint8_t mode1[2] = {0x00, 0b10000001};
-    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, mode1, 2, 5);
-
-    uint8_t mode2[2] = {0x01, 0b00000110};
-    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, mode2, 2, 5);
-
-    uint8_t ledout0[2] = {0x14, 0b10101010};
-    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout0, 2, 5);
-    uint8_t ledout1[2] = {0x15, 0b10101010};
-    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout1, 2, 5);
-    uint8_t ledout2[2] = {0x16, 0b10101010};
-    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout2, 2, 5);
-    uint8_t ledout3[2] = {0x17, 0b10101010};
-    HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout3, 2, 5);
-}
+// void pca9635_swrst() {
+//   uint8_t mode1[2] = {0xA5, 0x5A}; //  magic byte 1, magic byte 2
+//   HAL_I2C_Master_Transmit (&hi2c1, PCA9635_SWRST, mode1, 2, 5);
+//   uint8_t magic3 = 0x06;
+//   HAL_I2C_Master_Transmit (&hi2c1, 0x00, &magic3, 2, 5);
+//
+// }
+//
+// void pca9635_init() {
+//     // https://www.nxp.com/docs/en/data-sheet/PCA9635.pdf, page 10-13
+//     uint8_t mode1[2] = {0x00, 0b10000001};
+//     HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, mode1, 2, 5);
+//
+//     uint8_t mode2[2] = {0x01, 0b00000110};
+//     HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, mode2, 2, 5);
+//
+//     uint8_t ledout0[2] = {0x14, 0b10101010};
+//     HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout0, 2, 5);
+//     uint8_t ledout1[2] = {0x15, 0b10101010};
+//     HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout1, 2, 5);
+//     uint8_t ledout2[2] = {0x16, 0b10101010};
+//     HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout2, 2, 5);
+//     uint8_t ledout3[2] = {0x17, 0b10101010};
+//     HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, ledout3, 2, 5);
+// }
 
 /* USER CODE END 0 */
 
@@ -155,7 +152,6 @@ int main(void)
   uint8_t channels_on_state[NUM_CHANNELS] = {0,0,0,0,0};
   uint16_t brightness_setting_state = 0;
   float current_brightness_setting = 0;
-  uint8_t blink = 0;
 
   /* USER CODE END 1 */
 
@@ -180,27 +176,37 @@ int main(void)
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   MX_I2C1_Init();
+  MX_TIM1_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
   TIM2->CNT = 0;
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
 
-  i2cscan(); // TODO rem
-  pca9635_swrst();
-  pca9635_init();
+  // pca9635_swrst();
+  // pca9635_init();
+  //
+  // i2cscan();
+
+  TIM1->CCR4 = 0;
+  TIM3->CCR1 = 0;
+  TIM3->CCR2 = 0;
+  TIM3->CCR3 = 0;
+  TIM3->CCR4 = 0;
+
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
 
   printf("Setup DONE!\r\n");
-  i2cscan();
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
-    if(! blink) {
-      HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
-    }
-    blink++;
     if(off_bounce_count > 0) {
       off_bounce_count--;
     }
@@ -233,7 +239,7 @@ int main(void)
 
     // https://alexgyver.ru/lessons/led-crt/
     // out = max * ((val / max) ^ gamma)
-    float real_brightness_setting = 750.0f * pow((float)(brightness_setting << 6) / 4096.0f, 2.0f);
+    float real_brightness_setting = 50.0f * pow((float)(brightness_setting << 6) / 4096.0f, 2.0f);
 
     if(current_brightness_setting < real_brightness_setting) {
       if(real_brightness_setting - current_brightness_setting > 0.5f) {
@@ -254,7 +260,7 @@ int main(void)
     if(brightness_setting_state != brightness_setting) {
       state_changed = 1;
       brightness_setting_state = brightness_setting;
-      //printf("brightness_setting = %d\r\n", brightness_setting);
+      printf("brightness_setting = %d\r\n", brightness_setting);
     }
 
     for(uint8_t i = 0; i < NUM_CHANNELS; i++) {
@@ -269,13 +275,14 @@ int main(void)
       for(uint8_t i = 0; i < NUM_CHANNELS; i++) {
         if(channels_on_state[i] && brightness_setting > 0) {
           printf("ch %d duty cycle: %d\r\n", i, brightness_setting);
+          *tim_ccr_mapping[i] = brightness_setting;
         }
         else {
           printf("ch %d off\r\n", i);
+          *tim_ccr_mapping[i] = 0;
         }
 
-        uint8_t buffer[2] = {pca9635_output_mapping[i], brightness_setting};
-        HAL_I2C_Master_Transmit (&hi2c1, PCA9635_ADDR, buffer, 2, 5);
+
       }
     }
 
@@ -322,180 +329,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief I2C1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C1_Init(void)
-{
-
-  /* USER CODE BEGIN I2C1_Init 0 */
-
-  /* USER CODE END I2C1_Init 0 */
-
-  /* USER CODE BEGIN I2C1_Init 1 */
-
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 128;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2C1_Init 2 */
-
-  /* USER CODE END I2C1_Init 2 */
-
-}
-
-/**
-  * @brief TIM2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM2_Init(void)
-{
-
-  /* USER CODE BEGIN TIM2_Init 0 */
-
-  /* USER CODE END TIM2_Init 0 */
-
-  TIM_Encoder_InitTypeDef sConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM2_Init 1 */
-
-  /* USER CODE END TIM2_Init 1 */
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 65535;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
-  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
-  sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
-  sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC1Filter = 10;
-  sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
-  sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
-  sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC2Filter = 10;
-  if (HAL_TIM_Encoder_Init(&htim2, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM2_Init 2 */
-
-  /* USER CODE END TIM2_Init 2 */
-
-}
-
-/**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
-
-}
-
-/**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_GPIO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
-
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_5, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : PA2 */
-  GPIO_InitStruct.Pin = GPIO_PIN_2;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PB0 PB5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_5;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PB12 PB13 PB14 PB15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PA8 */
-  GPIO_InitStruct.Pin = GPIO_PIN_8;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI2_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI2_IRQn);
-
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-
-  /*Configure GPIO pins : PA2 PA8 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
